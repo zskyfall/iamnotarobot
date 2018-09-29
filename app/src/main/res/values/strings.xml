@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Iamnotarobot</string>
+    <string name="facebook_app_id">107185506851654</string>
+    <string name="fb_login_protocol_scheme">fb107185506851654</string>
+</resources>
