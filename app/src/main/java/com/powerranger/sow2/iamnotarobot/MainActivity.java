@@ -1,11 +1,20 @@
 package com.powerranger.sow2.iamnotarobot;
 
+import android.annotation.TargetApi;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
+import android.hardware.SensorListener;
 import android.hardware.SensorManager;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Build;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -25,10 +34,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.URISyntaxException;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     private SensorManager sensorManager;
-    private Sensor lightSensor;
+    private Sensor lightSensor; //cam bien anh sang
+    private Sensor mAccelerometer; //cam bien gia toc
+    private ShakeDetector mShakeDetector;
+
     private ImageView imageHeartLeft;
     private ImageView imageHeartRight;
     private RelativeLayout relativeLayout;
@@ -46,14 +59,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private Boolean isReceivingRequest = false;
 
+    int notificationID;
+
+    //NotificationHelper notificationHelper;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         Init();
+        createNotification();
     }
 
+    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     private void Init() {
 
         intent = getIntent();
@@ -86,21 +105,43 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         relativeLayout = findViewById(R.id.relative);
 
         sensorManager = (SensorManager) getSystemService(Service.SENSOR_SERVICE);
+
         lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
+        mAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+        mShakeDetector = new ShakeDetector();
+        mShakeDetector.setOnShakeListener(new ShakeDetector.OnShakeListener() {
+
+            @Override
+            public void onShake(int count) {
+
+                handleShakeEvent(count);
+            }
+        });
 
         imageHeartLeft.setVisibility(View.INVISIBLE);
         imageHeartRight.setVisibility(View.INVISIBLE);
+
+//        notificationHelper = new NotificationHelper(this);
+//        Notification.Builder builder = notificationHelper.getNotification("Thang", "hahaha");
+//        notificationHelper.getManager().notify(new Random().nextInt(), builder.build());
+    }
+
+    private void handleShakeEvent(int count) {
+        Toast.makeText(this, "lac : " + count, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         sensorManager.unregisterListener(this);
+        sensorManager.unregisterListener(mShakeDetector);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        sensorManager.registerListener(mShakeDetector, mAccelerometer,	SensorManager.SENSOR_DELAY_UI);
         sensorManager.registerListener(this, lightSensor, sensorManager.SENSOR_DELAY_NORMAL);
     }
 
@@ -258,4 +299,36 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             });
         }
     };
+
+    private void createNotification() {
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(this)
+                .setSmallIcon(R.drawable.heartleft)
+                .setContentTitle("Thong bao")
+                .setContentText("Co loi moi ket ban!");
+
+        Intent resulIntent = new Intent(this, RegisterActivity.class);
+
+        PendingIntent resultPendingIntent =
+                PendingIntent.getActivity(
+                        this,
+                        0,
+                        resulIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                );
+        builder.setContentIntent(resultPendingIntent);
+
+//        Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+//        builder.setSound(uri);
+
+        Uri notificationSound = Uri.parse("android.resource://"
+        + getPackageName() + "/" + R.raw.gaugau);
+        builder.setSound(notificationSound);
+
+        notificationID = 113;
+        NotificationManager manager =
+                (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        manager.notify(notificationID, builder.build());
+    }
+
 }
