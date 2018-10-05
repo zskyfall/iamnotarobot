@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     int notificationID;
 
+
     //NotificationHelper notificationHelper;
 
     @Override
