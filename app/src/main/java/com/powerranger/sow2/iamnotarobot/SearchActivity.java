@@ -8,10 +8,18 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
 import com.miguelcatalan.materialsearchview.MaterialSearchView;
+import com.powerranger.sow2.iamnotarobot.configuration.API;
 
 import java.util.ArrayList;
 
@@ -40,17 +48,52 @@ public class SearchActivity extends AppCompatActivity {
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                newText = newText.toLowerCase();
-                ArrayList<User> newList = new ArrayList<>();
-                for(User user : arrayListUser) {
-                    String name = user.getName().toLowerCase();
-                    if(name.contains(newText)) {
-                        newList.add(user);
-                    }
-                }
+                if(newText.length() > 0) {
+                    newText = newText.toLowerCase();
+                    String login_url = API.Server.SEARCH + newText;
+                    Ion.with(getApplicationContext())
+                            .load(login_url)
+                            .asJsonObject()
+                            .setCallback(new FutureCallback<JsonObject>() {
+                                @Override
+                                public void onCompleted(Exception e, JsonObject result) {
+                                    ArrayList<User> newList = new ArrayList<>();
+                                    if(result != null) {
 
-                searchAdapter.setFilter(newList);
-                return true;
+                                        JsonArray arrayUsers = result.getAsJsonArray("users");
+                                        for (int i = 0; i < arrayUsers.size(); i++) {
+                                            JsonObject objUser = arrayUsers.get(i).getAsJsonObject();
+
+                                            JsonElement eleEmail = objUser.get("email");
+                                            JsonElement eleName = objUser.get("name");
+                                            JsonElement eleAvatar = objUser.get("avatar");
+                                            JsonElement eleBirthday = objUser.get("birthday");
+                                            JsonElement eleGender = objUser.get("gender");
+                                            JsonElement eleFbId = objUser.get("fbId");
+                                            JsonElement eleToken = objUser.get("token");
+
+                                            String email = eleEmail.getAsString();
+                                            String name = eleName.getAsString();
+                                            String avatar = eleAvatar.getAsString();
+                                            String birthday = eleBirthday.getAsString();
+                                            String gender = eleGender.getAsString();
+                                            String fbId = eleFbId.getAsString();
+                                            String token = eleToken.getAsString();
+
+                                            User user = new User(fbId, name, avatar, email, gender, birthday, token);
+                                            newList.add(user);
+
+                                        }
+                                        searchAdapter.setFilter(newList);
+                                    }
+                                    else {
+                                        //Toast.makeText(SearchActivity.this, "" + e, Toast.LENGTH_SHORT).show();
+                                    }
+                                }
+                            });
+                    return true;
+                }
+                return false;
             }
         });
 
@@ -118,8 +161,8 @@ public class SearchActivity extends AppCompatActivity {
     }
 
     private void InitData() {
-        arrayListUser.add(new User("Đạt", "https://i.amz.mshcdn.com/jVlbT_4Y4wfaJaONj6dO6Qaie6M=/950x534/filters:quality(90)/2015%2F11%2F25%2F55%2FGettyImages.b564b.jpg", "thuy@gmail.com", "male"));
-        arrayListUser.add(new User("Thắng", "https://ste.india.com/sites/default/files/2014/08/02/164995-aamir-khan-650.jpg", "d.newgate@yahoo.com.vn", "male"));
-        arrayListUser.add(new User("Hari Won", "https://images.indianexpress.com/2018/07/aamir-khan-759.jpg", "hari@gmail.com", "male"));
+//        arrayListUser.add(new User("Đạt", "https://i.amz.mshcdn.com/jVlbT_4Y4wfaJaONj6dO6Qaie6M=/950x534/filters:quality(90)/2015%2F11%2F25%2F55%2FGettyImages.b564b.jpg", "thuy@gmail.com", "male"));
+//        arrayListUser.add(new User("Thắng", "https://ste.india.com/sites/default/files/2014/08/02/164995-aamir-khan-650.jpg", "d.newgate@yahoo.com.vn", "male"));
+//        arrayListUser.add(new User("Hari Won", "https://images.indianexpress.com/2018/07/aamir-khan-759.jpg", "hari@gmail.com", "male"));
     }
 }

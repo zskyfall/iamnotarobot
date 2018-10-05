@@ -3,11 +3,13 @@
     android:orientation="horizontal"
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp"
+    >
     <ImageView
         android:id="@+id/list_item_image_avatar"
-        android:layout_width="100dp"
-        android:layout_height="100dp" />
+        android:layout_width="80dp"
+        android:layout_height="80dp" />
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"

@@ -18,6 +18,10 @@ import com.facebook.GraphRequest;
 import com.facebook.GraphResponse;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
+import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
+import com.powerranger.sow2.iamnotarobot.configuration.API;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -54,17 +58,21 @@ public class RegisterActivity extends AppCompatActivity {
         loginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
             @Override
             public void onSuccess(LoginResult loginResult) {
-                String token = loginResult.getAccessToken().getToken();
+                final String token = loginResult.getAccessToken().getToken();
                 GraphRequest graphRequest = GraphRequest.newMeRequest(loginResult.getAccessToken(), new GraphRequest.GraphJSONObjectCallback() {
                     @Override
                     public void onCompleted(JSONObject object, GraphResponse response) {
-                        getFacebookData(object);
+                        User user = getFacebookUser(object, token);
+                        if(user != null) {
+                            login(user);
+                        }
+
                         Log.d("kiemtra", response.toString());
                     }
                 });
 
                 Bundle parameters = new Bundle();
-                parameters.putString("fields", "id,email,birthday,friends,gender");
+                parameters.putString("fields", "id,email,birthday,friends,gender,name");
                 graphRequest.setParameters(parameters);
                 graphRequest.executeAsync();
             }
@@ -81,17 +89,21 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
-    private void getFacebookData(JSONObject object) {
+    private User getFacebookUser(JSONObject object, String token) {
+        User user;
         try {
             String id = object.getString("id");
             URL profile_picture = new URL("https://graph.facebook.com/" +
                     id + "/picture?width=250&height=250");
+            String avatar = profile_picture.toString();
+            String name = object.getString("name");
             String email = object.getString("email");
             String birthday = object.getString("birthday");
             String friends = object.getJSONObject("friends").getJSONObject("summary").getString("total_count");
             String gender = object.getString("gender");
 
-            goMainScreen(id, profile_picture.toString(), email, birthday, friends, gender);
+            user = new User(id, name, avatar, email, gender, birthday, token);
+            return user;
 
         } catch (MalformedURLException e) {
             e.printStackTrace();
@@ -100,20 +112,51 @@ public class RegisterActivity extends AppCompatActivity {
             e.printStackTrace();
             Toast.makeText(this, "" + e, Toast.LENGTH_SHORT).show();
         }
+
+        return null;
     }
 
-    private void goMainScreen(String id, String profile_picture, String email, String birthday,
-                              String friends, String gender) {
+    private void goMainScreen(User user) {
         Intent intent = new Intent(RegisterActivity.this, MainActivity.class);
         Bundle bundle = new Bundle();
-        bundle.putString("id", id);
-        bundle.putString("avatar", profile_picture);
-        bundle.putString("email", email);
-        bundle.putString("birthday", birthday);
-        bundle.putString("friends", friends);
-        bundle.putString("gender", gender);
+        bundle.putString("id", user.getId());
+        bundle.putString("avatar", user.getAvatar());
+        bundle.putString("email", user.getEmail());
+        bundle.putString("birthday", user.getBirthday());
+        //bundle.putString("friends", friends);
+        bundle.putString("gender", user.getGender());
         intent.putExtra("profile", bundle);
         startActivity(intent);
+    }
+
+    private void login(final User user) {
+        if(user != null) {
+            JsonObject json = new JsonObject();
+            json.addProperty("email", user.getEmail());
+            json.addProperty("avatar", user.getAvatar() );
+            json.addProperty("name", user.getName());
+            json.addProperty("birthday", user.getBirthday() );
+            json.addProperty("gender",user.getGender() );
+            json.addProperty("token", user.getToken());
+            json.addProperty("fbId", user.getId());
+
+            Ion.with(this)
+                    .load(API.Server.LOGIN)
+                    .setJsonObjectBody(json)
+                    .asJsonObject()
+                    .setCallback(new FutureCallback<JsonObject>() {
+                        @Override
+                        public void onCompleted(Exception e, JsonObject result) {
+                            if(result != null) {
+                                Toast.makeText(RegisterActivity.this, "" + result, Toast.LENGTH_SHORT).show();
+                                goMainScreen(user);
+                            }
+                            else {
+                                Toast.makeText(RegisterActivity.this, "ERROR: " + e, Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+        }
     }
 
     @Override
