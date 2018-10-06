@@ -50,9 +50,13 @@ public class SearchActivity extends AppCompatActivity {
             public boolean onQueryTextChange(String newText) {
                 if(newText.length() > 0) {
                     newText = newText.toLowerCase();
-                    String login_url = API.Server.SEARCH + newText;
+                    String search_url = API.Server.SEARCH;
+
+                    JsonObject json = new JsonObject();
+                    json.addProperty("query", newText);
                     Ion.with(getApplicationContext())
-                            .load(login_url)
+                            .load(search_url)
+                            .setJsonObjectBody(json)
                             .asJsonObject()
                             .setCallback(new FutureCallback<JsonObject>() {
                                 @Override
@@ -93,7 +97,11 @@ public class SearchActivity extends AppCompatActivity {
                             });
                     return true;
                 }
-                return false;
+                else {
+                    ArrayList<User> emptyList = new ArrayList<>();
+                    searchAdapter.setFilter(emptyList);
+                    return false;
+                }
             }
         });
 

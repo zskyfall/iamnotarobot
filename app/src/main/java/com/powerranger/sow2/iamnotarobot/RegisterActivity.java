@@ -41,7 +41,8 @@ public class RegisterActivity extends AppCompatActivity {
         setContentView(R.layout.activity_register);
 
         Init();
-
+        checkIsLogined();
+        EventHandle();
     }
 
     private void Init() {
@@ -54,6 +55,9 @@ public class RegisterActivity extends AppCompatActivity {
         loginButton.setReadPermissions(Arrays.asList("public_profile", "email", "user_birthday",
                 "user_friends", "user_gender"));
 
+    }
+
+    private void EventHandle() {
         // Callback registration
         loginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
             @Override
@@ -89,6 +93,26 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
+    private void checkIsLogined() {
+        if(accessToken != null) {
+            final String token = accessToken.getToken();
+            GraphRequest graphRequest = GraphRequest.newMeRequest(accessToken, new GraphRequest.GraphJSONObjectCallback() {
+                @Override
+                public void onCompleted(JSONObject object, GraphResponse response) {
+                    User user = getFacebookUser(object, token);
+                    if(user != null) {
+                        login(user);
+                    }
+                }
+            });
+
+            Bundle parameters = new Bundle();
+            parameters.putString("fields", "id,email,birthday,friends,gender,name");
+            graphRequest.setParameters(parameters);
+            graphRequest.executeAsync();
+        }
+    }
+
     private User getFacebookUser(JSONObject object, String token) {
         User user;
         try {
@@ -121,6 +145,7 @@ public class RegisterActivity extends AppCompatActivity {
         Bundle bundle = new Bundle();
         bundle.putString("id", user.getId());
         bundle.putString("avatar", user.getAvatar());
+        bundle.putString("name", user.getName());
         bundle.putString("email", user.getEmail());
         bundle.putString("birthday", user.getBirthday());
         //bundle.putString("friends", friends);

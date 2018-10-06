@@ -14,29 +14,48 @@ import android.hardware.SensorManager;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.speech.RecognizerIntent;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.daimajia.androidanimations.library.Techniques;
 import com.daimajia.androidanimations.library.YoYo;
 import com.github.nkzawa.emitter.Emitter;
 import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
+import com.miguelcatalan.materialsearchview.MaterialSearchView;
+import com.powerranger.sow2.iamnotarobot.configuration.API;
+import com.powerranger.sow2.iamnotarobot.interfaces.SearchItemClickListener;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Random;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
+public class MainActivity extends AppCompatActivity implements SensorEventListener, SearchItemClickListener {
     private SensorManager sensorManager;
     private Sensor lightSensor; //cam bien anh sang
     private Sensor mAccelerometer; //cam bien gia toc
@@ -44,10 +63,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private ImageView imageHeartLeft;
     private ImageView imageHeartRight;
+    private ImageView imageMyAvatar;
+    private ImageView imageCrushAvatar;
+    private TextView textMyName;
+    private TextView textCrushName;
+
+    private RelativeLayout relativeMainContent;
     private RelativeLayout relativeLayout;
-    private EditText editReceiverUsername;
     private Socket mSocket;
-    private final String SOCKET_URL = "http://192.168.0.110:3001";
+    private final String SOCKET_URL = API.Server.SOCKET_URL;
     private Intent intent;
     private Bundle bundle;
     private String receiverEmail;
@@ -56,10 +80,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private String avatar;
     private String birthday;
     private String gender;
+    private String name;
+    private String crushEmail;
 
     private Boolean isReceivingRequest = false;
 
     int notificationID;
+
+    private MaterialSearchView searchView;
+    private ArrayList<User> arrayListUser = new ArrayList<>();
+    private SearchAdapter searchAdapter;
+    private RecyclerView recyclerView;
+    RecyclerView.LayoutManager layoutManager;
+    Toolbar mToolbar;
 
 
     //NotificationHelper notificationHelper;
@@ -70,10 +103,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         setContentView(R.layout.activity_main);
 
         Init();
+        InitSearch();
         createNotification();
+        searchEventHandle();
     }
 
-    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     private void Init() {
 
         intent = getIntent();
@@ -85,9 +119,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             email = bundle.getString("email");
             birthday = bundle.getString("birthday");
             gender = bundle.getString("gender");
+            name = bundle.getString("name");
         }
 
-        Toast.makeText(this, "Thong tin: " + email, Toast.LENGTH_SHORT).show();
+        //Toast.makeText(this, "Thong tin: " + email, Toast.LENGTH_SHORT).show();
 
         try {
             mSocket = IO.socket(SOCKET_URL);
@@ -100,10 +135,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         mSocket.connect();
 
-        editReceiverUsername = findViewById(R.id.edit_receiver_username);
         imageHeartLeft = findViewById(R.id.image_heart_left);
         imageHeartRight = findViewById(R.id.image_heart_right);
+        imageMyAvatar = findViewById(R.id.image_my_avatar);
+        imageCrushAvatar = findViewById(R.id.image_crush_avatar);
+        textMyName = findViewById(R.id.text_my_name);
+        textCrushName = findViewById(R.id.text_crush_name);
+
+        Glide.with(this).load(avatar).into(imageMyAvatar);
+        textMyName.setText(name);
+
         relativeLayout = findViewById(R.id.relative);
+        relativeMainContent = findViewById(R.id.relative_main_content);
 
         sensorManager = (SensorManager) getSystemService(Service.SENSOR_SERVICE);
 
@@ -123,13 +166,122 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         imageHeartLeft.setVisibility(View.INVISIBLE);
         imageHeartRight.setVisibility(View.INVISIBLE);
 
-//        notificationHelper = new NotificationHelper(this);
-//        Notification.Builder builder = notificationHelper.getNotification("Thang", "hahaha");
-//        notificationHelper.getManager().notify(new Random().nextInt(), builder.build());
+    }
+
+    private void InitSearch() {
+        mToolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(mToolbar);
+        searchView = findViewById(R.id.search_view);
+        searchView.setVoiceSearch(true); //or false
+        recyclerView = findViewById(R.id.recycler_search_result);
+        layoutManager = new LinearLayoutManager(this);
+        recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setHasFixedSize(true);
+
+        searchAdapter = new SearchAdapter(this, arrayListUser);
+        searchAdapter.addClickListenter(this);
+        recyclerView.setAdapter(searchAdapter);
+    }
+
+    private void searchEventHandle() {
+        searchView.setOnQueryTextListener(new MaterialSearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                //Do some magic
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                if(newText.length() > 0) {
+                    newText = newText.toLowerCase();
+                    String search_url = API.Server.SEARCH;
+
+                    JsonObject json = new JsonObject();
+                    json.addProperty("query", newText);
+                    Ion.with(getApplicationContext())
+                            .load(search_url)
+                            .setJsonObjectBody(json)
+                            .asJsonObject()
+                            .setCallback(new FutureCallback<JsonObject>() {
+                                @Override
+                                public void onCompleted(Exception e, JsonObject result) {
+                                    ArrayList<User> newList = new ArrayList<>();
+                                    if(result != null) {
+
+                                        JsonArray arrayUsers = result.getAsJsonArray("users");
+                                        for (int i = 0; i < arrayUsers.size(); i++) {
+                                            JsonObject objUser = arrayUsers.get(i).getAsJsonObject();
+
+                                            JsonElement eleEmail = objUser.get("email");
+                                            JsonElement eleName = objUser.get("name");
+                                            JsonElement eleAvatar = objUser.get("avatar");
+                                            JsonElement eleBirthday = objUser.get("birthday");
+                                            JsonElement eleGender = objUser.get("gender");
+                                            JsonElement eleFbId = objUser.get("fbId");
+                                            JsonElement eleToken = objUser.get("token");
+
+                                            String email = eleEmail.getAsString();
+                                            String name = eleName.getAsString();
+                                            String avatar = eleAvatar.getAsString();
+                                            String birthday = eleBirthday.getAsString();
+                                            String gender = eleGender.getAsString();
+                                            String fbId = eleFbId.getAsString();
+                                            String token = eleToken.getAsString();
+
+                                            User user = new User(fbId, name, avatar, email, gender, birthday, token);
+                                            newList.add(user);
+
+                                        }
+                                        searchAdapter.setFilter(newList);
+                                    }
+                                    else {
+                                        //Toast.makeText(SearchActivity.this, "" + e, Toast.LENGTH_SHORT).show();
+                                    }
+                                }
+                            });
+                    return true;
+                }
+                else {
+                    ArrayList<User> emptyList = new ArrayList<>();
+                    searchAdapter.setFilter(emptyList);
+                    return false;
+                }
+            }
+        });
+
+        searchView.setOnSearchViewListener(new MaterialSearchView.SearchViewListener() {
+            @Override
+            public void onSearchViewShown() {
+                hideMainContent();
+            }
+
+            @Override
+            public void onSearchViewClosed() {
+                showMainContent();
+            }
+        });
+
     }
 
     private void handleShakeEvent(int count) {
         Toast.makeText(this, "lac : " + count, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showSearchList() {
+        recyclerView.setVisibility(View.VISIBLE);
+    }
+
+    private void hideSearchList() {
+        recyclerView.setVisibility(View.GONE);
+    }
+
+    private void showMainContent() {
+        relativeMainContent.setVisibility(View.VISIBLE);
+    }
+
+    private void hideMainContent() {
+        relativeMainContent.setVisibility(View.GONE);
     }
 
     @Override
@@ -164,7 +316,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     else { // Thuc hien gui loi moi ket ban
                         showHeartLeft();
 
-                        sendMatchRequest(email, editReceiverUsername.getText().toString());
+                        sendMatchRequest(email, crushEmail);
                     }
                 }
                 else {
@@ -187,6 +339,41 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onDestroy();
         mSocket.disconnect();
         //mSocket.off("new message", onBroadcastMatchRequest);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu, menu);
+
+        MenuItem item = menu.findItem(R.id.action_search);
+        searchView.setMenuItem(item);
+
+        return true;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == MaterialSearchView.REQUEST_VOICE && resultCode == RESULT_OK) {
+            ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            if (matches != null && matches.size() > 0) {
+                String searchWrd = matches.get(0);
+                if (!TextUtils.isEmpty(searchWrd)) {
+                    searchView.setQuery(searchWrd, false);
+                }
+            }
+
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (searchView.isSearchOpen()) {
+            searchView.closeSearch();
+        } else {
+            super.onBackPressed();
+        }
     }
 
     private void sendMatchRequest(String sender, String receiver) {
@@ -332,4 +519,17 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         manager.notify(notificationID, builder.build());
     }
 
+    @Override
+    public void onItemClicked(String avatar, String name, String email) {
+        hideSearchList();
+        showMainContent();
+        searchView.closeSearch();
+        searchView.clearFocus();
+        imageCrushAvatar.setVisibility(View.VISIBLE);
+        textCrushName.setVisibility(View.VISIBLE);
+        crushEmail = email;
+        Glide.with(this).load(avatar).into(imageCrushAvatar);
+        textCrushName.setText(name);
+
+    }
 }
