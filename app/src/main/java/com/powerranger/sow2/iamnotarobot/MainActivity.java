@@ -94,7 +94,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     RecyclerView.LayoutManager layoutManager;
     Toolbar mToolbar;
 
-
     //NotificationHelper notificationHelper;
 
     @Override
@@ -193,6 +192,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             @Override
             public boolean onQueryTextChange(String newText) {
+                showSearchList();
                 if(newText.length() > 0) {
                     newText = newText.toLowerCase();
                     String search_url = API.Server.SEARCH;
@@ -268,22 +268,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Toast.makeText(this, "lac : " + count, Toast.LENGTH_SHORT).show();
     }
 
-    private void showSearchList() {
-        recyclerView.setVisibility(View.VISIBLE);
-    }
-
-    private void hideSearchList() {
-        recyclerView.setVisibility(View.GONE);
-    }
-
-    private void showMainContent() {
-        relativeMainContent.setVisibility(View.VISIBLE);
-    }
-
-    private void hideMainContent() {
-        relativeMainContent.setVisibility(View.GONE);
-    }
-
     @Override
     protected void onPause() {
         super.onPause();
@@ -314,8 +298,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         acceptMatchRequest(email, receiverEmail);
                     }
                     else { // Thuc hien gui loi moi ket ban
-                        showHeartLeft();
-
                         sendMatchRequest(email, crushEmail);
                     }
                 }
@@ -347,7 +329,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         MenuItem item = menu.findItem(R.id.action_search);
         searchView.setMenuItem(item);
-
         return true;
     }
 
@@ -377,18 +358,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void sendMatchRequest(String sender, String receiver) {
-        JsonObject json = new JsonObject();
-        json.addProperty("sender", sender);
-        json.addProperty("receiver", receiver);
 
-        mSocket.emit("send match request", json);
+        if(receiver != null && !receiver.equals("")) {
+            JsonObject json = new JsonObject();
+            json.addProperty("sender", sender);
+            json.addProperty("sender_name", name);
+            json.addProperty("sender_avatar", avatar);
+            json.addProperty("receiver", receiver);
+
+            mSocket.emit("send match request", json);
+            showHeartLeft();
+        }
+        else {
+            Toast.makeText(this, "Chọn Người Nhận Trước!", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void acceptMatchRequest(String sender, String receiver) {
         JsonObject json = new JsonObject();
         json.addProperty("sender", sender);
         json.addProperty("receiver", receiver);
-
+        showHeartLeft();
         mSocket.emit("accept request", json);
     }
 
@@ -420,6 +410,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 .playOn(imageHeartRight);
     }
 
+    private void hideHeartLeft() {
+        imageHeartLeft.setVisibility(View.GONE);
+    }
+
+    private void hideHeartRight() {
+        imageHeartRight.setVisibility(View.GONE);
+    }
+
+    private void showSearchList() {
+        recyclerView.setVisibility(View.VISIBLE);
+    }
+
+    private void hideSearchList() {
+        recyclerView.setVisibility(View.GONE);
+    }
+
+    private void showMainContent() {
+        relativeMainContent.setVisibility(View.VISIBLE);
+    }
+
+    private void hideMainContent() {
+        relativeMainContent.setVisibility(View.GONE);
+    }
+
     private Emitter.Listener onBroadcastMatchRequest = new Emitter.Listener() {
         @Override
         public void call(final Object... args) {
@@ -430,17 +444,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     JSONObject data = (JSONObject) args[0];
                     Toast.makeText(MainActivity.this, "data: " + data, Toast.LENGTH_SHORT).show();
                     String sender;
+                    String sender_name;
+                    String sender_avatar;
                     String receiver;
                     try {
                         sender = data.getString("sender");
+                        sender_avatar = data.getString("sender_avatar");
+                        sender_name = data.getString("sender_name");
                         receiverEmail = sender;
                         receiver = data.getString("receiver");
 
                         if(receiver.equals(email)) {
                             Toast.makeText(MainActivity.this, "receiver: " + receiver, Toast.LENGTH_SHORT).show();
                             isReceivingRequest = true;
-
-                            showHeartLeft();
+                            textCrushName.setText(sender_name);
+                            Glide.with(getApplicationContext()).load(sender_avatar).into(imageCrushAvatar);
+                            showHeartRight();
 
                             Toast.makeText(MainActivity.this, "Co loi moi ket ban ne!",
                                     Toast.LENGTH_SHORT).show();
@@ -523,6 +542,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onItemClicked(String avatar, String name, String email) {
         hideSearchList();
         showMainContent();
+        hideHeartLeft();
+        hideHeartRight();
         searchView.closeSearch();
         searchView.clearFocus();
         imageCrushAvatar.setVisibility(View.VISIBLE);

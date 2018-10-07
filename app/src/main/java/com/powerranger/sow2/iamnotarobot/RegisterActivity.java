@@ -22,6 +22,7 @@ import com.google.gson.JsonObject;
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
 import com.powerranger.sow2.iamnotarobot.configuration.API;
+import com.wang.avi.AVLoadingIndicatorView;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -34,6 +35,7 @@ public class RegisterActivity extends AppCompatActivity {
     private CallbackManager callbackManager;
     private LoginButton loginButton;
     private AccessToken accessToken;
+    private AVLoadingIndicatorView avLoadingIndicatorView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +56,7 @@ public class RegisterActivity extends AppCompatActivity {
         loginButton = (LoginButton) findViewById(R.id.login_button);
         loginButton.setReadPermissions(Arrays.asList("public_profile", "email", "user_birthday",
                 "user_friends", "user_gender"));
+        avLoadingIndicatorView = findViewById(R.id.avloading_login);
 
     }
 
@@ -95,6 +98,8 @@ public class RegisterActivity extends AppCompatActivity {
 
     private void checkIsLogined() {
         if(accessToken != null) {
+            loginButton.setVisibility(View.GONE);
+            avLoadingIndicatorView.setVisibility(View.VISIBLE);
             final String token = accessToken.getToken();
             GraphRequest graphRequest = GraphRequest.newMeRequest(accessToken, new GraphRequest.GraphJSONObjectCallback() {
                 @Override

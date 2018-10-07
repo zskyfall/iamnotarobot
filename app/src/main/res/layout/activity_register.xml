@@ -17,4 +17,16 @@
         android:layout_centerVertical="true"
         />
 
+    <com.wang.avi.AVLoadingIndicatorView
+        android:id="@+id/avloading_login"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        app:indicatorName="BallClipRotatePulseIndicator"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        style="@style/AVLoadingIndicatorView"
+        android:visibility="invisible"
+        app:indicatorColor="#136e50"
+        />
+
 </RelativeLayout>
